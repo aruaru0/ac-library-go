@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"ac-library-go/maxflow"
+	"github.com/aruaru0/ac-library-go/maxflow"
 )
 
 func assertEdgeEq[Cap, Cost Integer](t *testing.T, expect, actual MCFEdge[Cap, Cost]) {

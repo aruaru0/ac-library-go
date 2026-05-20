@@ -4,7 +4,7 @@ import (
 	"math/bits"
 	"sync"
 
-	"ac-library-go/modint"
+	"github.com/aruaru0/ac-library-go/modint"
 )
 
 func countrZero(n uint32) int {

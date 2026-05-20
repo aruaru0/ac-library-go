@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"ac-library-go/modint"
+	"github.com/aruaru0/ac-library-go/modint"
 )
 
 func convNaive[M modint.Modulus](a, b []modint.StaticModint[M]) []modint.StaticModint[M] {

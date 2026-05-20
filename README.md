@@ -6,7 +6,7 @@ AtCoder Library (AC Library) を Idiomatic な Go 言語 (Go 1.18+ の Generics 
 
 - **データ構造**: `dsu` (Union-Find), `fenwicktree`, `segtree`, `lazysegtree`
 - **グラフ・フロー**: `scc`, `twosat`, `maxflow`, `mincostflow`
-- **数学・文字列**: `math`, `modint`, `convolution`, `string`
+- **数学・文字列**: `math`, `modint`, `mint` (モジュラ演算ヘルパー), `convolution`, `string`
 
 ## 使い方
 
@@ -111,6 +111,17 @@ func (d *DSU) Same(a, b int) bool {
 
 // ...
 ```
+
+## modint と mint の違いについて
+
+Go言語には演算子オーバーロードがないため、本家 ACL 同様の構造体に値をラップする `modint` パッケージを使用すると、数式の記述が `a.Add(b).Mul(c)` のように冗長になり、直感的な実装が難しくなる傾向があります。
+
+これに対処するため、書きやすさを重視したモジュラ演算ヘルパーモジュール **`mint`** を用意しました。
+`mint` は値自体をラップするのではなく、「法（mod）と計算用バッファを持つコンテクスト」を提供し、通常の `int` 同士で演算を行います（例: `m.Add(a, m.Mul(b, c))`）。
+
+さらに、`mint` には実用性を高めるため以下の便利な拡張も内包されています：
+* **組み合わせ計算**: $_n\text{C}_r$ や階乗・逆元テーブルの $O(N)$ 一括事前構築
+* **行列累乗**: $A^p \pmod{mod}$ の高速計算（フィボナッチ数の高速計算等に有用）
 
 ## ドキュメント
 

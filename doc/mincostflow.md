@@ -92,3 +92,29 @@ func (g *MCFGraph[Cap, Cost]) Edges() []MCFMCFEdge[Cap, Cost]
 **計算量**
 * `GetEdge`: $O(1)$
 * `Edges`: $O(m)$
+
+## 使用例
+
+```go
+package main
+
+import (
+	"fmt"
+	"github.com/aruaru0/ac-library-go/mincostflow"
+)
+
+func main() {
+	// 4頂点のグラフ (0: 始点, 3: 終点)
+	g := mincostflow.NewMCFGraph[int, int](4)
+
+	g.AddEdge(0, 1, 2, 1) // from, to, cap, cost
+	g.AddEdge(0, 2, 1, 2)
+	g.AddEdge(1, 2, 1, 1)
+	g.AddEdge(1, 3, 1, 3)
+	g.AddEdge(2, 3, 2, 1)
+
+	// 0 から 3 へ流量 2 を流す最小費用
+	flow, cost := g.FlowLimit(0, 3, 2)
+	fmt.Printf("Flow: %d, Cost: %d\n", flow, cost) // Flow: 2, Cost: 6
+}
+```

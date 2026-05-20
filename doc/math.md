@@ -68,3 +68,26 @@ $$\sum_{i = 0}^{n - 1} \left\lfloor \frac{a \times i + b}{m} \right\rfloor$$
 
 **計算量**
 * $O(\log m)$
+
+## 使用例
+
+```go
+package main
+
+import (
+	"fmt"
+	"github.com/aruaru0/ac-library-go/math"
+)
+
+func main() {
+	// (2^10) % 1000 = 1024 % 1000 = 24
+	fmt.Println(math.PowMod(2, 10, 1000))
+
+	// 3 * x ≡ 1 (mod 7) を満たす x -> 5
+	fmt.Println(math.InvMod(3, 7))
+
+	// x ≡ 2 (mod 3), x ≡ 3 (mod 5) を満たす最小の非負整数 x -> 8
+	r, m := math.CRT([]int64{2, 3}, []int64{3, 5})
+	fmt.Printf("x ≡ %d (mod %d)\n", r, m) // x ≡ 8 (mod 15)
+}
+```

@@ -50,3 +50,28 @@ func (f *FenwickTree[T]) Sum(l, r int) T
 
 **計算量**
 * $O(\log n)$
+
+## 使用例
+
+```go
+package main
+
+import (
+	"fmt"
+	"github.com/aruaru0/ac-library-go/fenwicktree"
+)
+
+func main() {
+	// 長さ 5 の Fenwick Tree を作成
+	fw := fenwicktree.NewFenwickTree[int](5)
+
+	// 値の加算
+	fw.Add(0, 10)
+	fw.Add(2, 20)
+	fw.Add(4, 30)
+
+	// 区間和の取得 (半開区間 [l, r))
+	fmt.Println(fw.Sum(0, 3)) // a[0] + a[1] + a[2] = 10 + 0 + 20 = 30
+	fmt.Println(fw.Sum(1, 5)) // a[1] + a[2] + a[3] + a[4] = 0 + 20 + 0 + 30 = 50
+}
+```

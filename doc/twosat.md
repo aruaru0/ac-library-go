@@ -62,3 +62,33 @@ func (ts *TwoSAT) Answer() []bool
 
 **計算量**
 * $O(n)$
+
+## 使用例
+
+```go
+package main
+
+import (
+	"fmt"
+	"github.com/aruaru0/ac-library-go/twosat"
+)
+
+func main() {
+	// 3変数の 2-SAT (x_0, x_1, x_2)
+	ts := twosat.NewTwoSAT(3)
+
+	// (x_0 または x_1)
+	ts.AddClause(0, true, 1, true)
+	// (not x_0 または not x_2)
+	ts.AddClause(0, false, 2, false)
+	// (x_1 または x_2)
+	ts.AddClause(1, true, 2, true)
+
+	if ts.Satisfiable() {
+		fmt.Println("Satisfiable")
+		fmt.Println(ts.Answer()) // [true true false] などの解 (満たす割り当ての1つ)
+	} else {
+		fmt.Println("Unsatisfiable")
+	}
+}
+```

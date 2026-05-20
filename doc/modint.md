@@ -11,20 +11,24 @@ package main
 
 import (
 	"fmt"
-	"ac-library-go/modint"
+	"github.com/aruaru0/ac-library-go/modint"
 )
 
 func main() {
-	// sum of array (mod 998244353)
-	var n int
-	fmt.Scan(&n)
-	sum := modint.NewModint998244353(0)
-	for i := 0; i < n; i++ {
-		var x int64
-		fmt.Scan(&x)
-		sum = sum.Add(modint.NewModint998244353(x))
-	}
-	fmt.Println(sum.Val())
+	a := modint.NewModint998244353(1000000000)
+	b := modint.NewModint998244353(2000000000)
+
+	// (10^9 + 2*10^9) % 998244353
+	fmt.Println(a.Add(b)) // 3511294
+
+	// (10^9 * 2*10^9) % 998244353
+	fmt.Println(a.Mul(b)) // 1599388
+
+	// 累乗 a^10 % 998244353
+	fmt.Println(a.Pow(10))
+
+	// 逆元 a^-1 % 998244353
+	fmt.Println(a.Inv())
 }
 ```
 
@@ -37,20 +41,16 @@ package main
 
 import (
 	"fmt"
-	"ac-library-go/modint"
+	"github.com/aruaru0/ac-library-go/modint"
 )
 
 func main() {
-	var n int
-	var mod uint32
-	fmt.Scan(&n, &mod)
-	sum := modint.NewDynamic(0, mod)
-	for i := 0; i < n; i++ {
-		var x int64
-		fmt.Scan(&x)
-		sum = sum.Add(modint.NewDynamic(x, mod))
-	}
-	fmt.Println(sum.Val())
+	var mod uint32 = 1000000007
+	a := modint.NewDynamic(1000000000, mod)
+	b := modint.NewDynamic(2000000000, mod)
+
+	// (10^9 + 2*10^9) % 1000000007
+	fmt.Println(a.Add(b)) // 999999993
 }
 ```
 

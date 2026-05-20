@@ -44,3 +44,23 @@ func ConvolutionLL(a, b []int64) []int64
 
 **計算量**
 * $O((N+M) \log(N+M))$
+
+## 使用例
+
+```go
+package main
+
+import (
+	"fmt"
+	"github.com/aruaru0/ac-library-go/convolution"
+)
+
+func main() {
+	a := []int64{1, 2, 3}
+	b := []int64{4, 5, 6}
+
+	// a と b の畳み込みを計算
+	c := convolution.ConvolutionLL(a, b)
+	fmt.Println(c) // [4, 13, 28, 27, 18]
+}
+```

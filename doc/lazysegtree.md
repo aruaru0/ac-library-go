@@ -136,3 +136,44 @@ func (st *LazySegTree[S, F]) MinLeft(r int, g func(S) bool) int
 
 **計算量**
 * $O(\log n)$
+
+## 使用例
+
+```go
+package main
+
+import (
+	"fmt"
+	"math"
+	"github.com/aruaru0/ac-library-go/lazysegtree"
+)
+
+func main() {
+	// S: 要素の型 (int)
+	// F: 写像の型 (int, 更新値。 math.MaxInt32 を「更新なし（id）」とする)
+	op := func(a, b int) int {
+		if a < b { return a }
+		return b
+	}
+	e := func() int { return math.MaxInt32 }
+
+	mapping := func(f int, x int) int {
+		if f == math.MaxInt32 { return x }
+		return f
+	}
+	composition := func(f, g int) int {
+		if f == math.MaxInt32 { return g }
+		return f
+	}
+	id := func() int { return math.MaxInt32 }
+
+	v := []int{1, 5, 3, 8, 2}
+	st := lazysegtree.NewLazySegTreeFromSlice(v, op, e, mapping, composition, id)
+
+	// 区間 [1, 4) (値: 5, 3, 8) に一括で 9 を書き込む
+	st.ApplyRange(1, 4, 9)
+
+	fmt.Println(st.Prod(0, 3)) // [1, 9, 9] の最小値 -> 1
+	fmt.Println(st.Prod(1, 5)) // [9, 9, 9, 2] の最小値 -> 2
+}
+```

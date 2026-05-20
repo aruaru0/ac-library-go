@@ -94,3 +94,33 @@ func (d *DSU) Groups() [][]int
 
 **計算量**
 * $O(n)$
+
+## 使用例
+
+```go
+package main
+
+import (
+	"fmt"
+	"github.com/aruaru0/ac-library-go/dsu"
+)
+
+func main() {
+	// 5頂点のDSUを作成 (0, 1, 2, 3, 4)
+	d := dsu.NewDSU(5)
+
+	d.Merge(0, 1)
+	d.Merge(2, 3)
+
+	fmt.Println(d.Same(0, 1)) // true
+	fmt.Println(d.Same(0, 2)) // false
+
+	// 1と2を結合することで、{0, 1} と {2, 3} が結合して {0, 1, 2, 3} になる
+	d.Merge(1, 2)
+	fmt.Println(d.Same(0, 2)) // true
+	fmt.Println(d.Size(0))   // 4 (0の属するグループ의サイズ)
+
+	// グループ一覧の取得
+	fmt.Println(d.Groups()) // [[0 1 2 3] [4]] (出力順は未定義)
+}
+```

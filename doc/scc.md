@@ -46,3 +46,29 @@ func (g *SCCGraph) SCC() [][]int
 **計算量**
 追加した辺の本数を $m$ として
 * $O(n + m)$
+
+## 使用例
+
+```go
+package main
+
+import (
+	"fmt"
+	"github.com/aruaru0/ac-library-go/scc"
+)
+
+func main() {
+	// 4頂点のグラフ
+	g := scc.NewSCCGraph(4)
+
+	// サイクル 0 -> 1 -> 2 -> 0 を作成
+	g.AddEdge(0, 1)
+	g.AddEdge(1, 2)
+	g.AddEdge(2, 0)
+	// 2 から 3 へ伸ばす (3は単体で連結成分になる)
+	g.AddEdge(2, 3)
+
+	sccList := g.SCC()
+	fmt.Println(sccList) // [[0 1 2] [3]] (トポロジカル順にグループ化されて出力)
+}
+```

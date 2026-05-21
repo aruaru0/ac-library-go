@@ -112,6 +112,47 @@ func (d *DSU) Same(a, b int) bool {
 // ...
 ```
 
+---
+
+### 方法3. 提出用コード自動生成ツール (`acl-go-expander`) を使う (おすすめ)
+
+手動でのコピー＆ペーストやパッケージプレフィックスの削除を自動化するコマンドラインツールを用意しています。本ツールは、通常のインポート文を使ったコードから、提出用の自己完結した単一ファイルを自動生成します。
+
+**1. ツールのインストール**
+```bash
+go install github.com/aruaru0/ac-library-go/cmd/acl-go-expander@latest
+```
+*(※ `~/go/bin` にパスが通っている必要があります)*
+
+**2. 開発コードの作成**
+通常通り外部パッケージをインポートして解答コードを書きます（エディタのコード補完やコンパイルチェックの恩恵をすべて受けられます）。
+
+```go
+package main
+
+import (
+	"fmt"
+	"github.com/aruaru0/ac-library-go/dsu"
+)
+
+func main() {
+	uf := dsu.NewDSU(5)
+	uf.Merge(0, 1)
+	fmt.Println(uf.Same(0, 1))
+}
+```
+
+**3. 提出用コードの生成**
+ターミナルで以下のコマンドを実行し、ライブラリコードがマージされた単一ファイルを生成します。
+
+```bash
+acl-go-expander -o submit.go main.go
+```
+
+生成された `submit.go` をそのまま AtCoder などのジャッジシステムに提出してください。
+
+---
+
 ## modint と mint の違いについて
 
 Go言語には演算子オーバーロードがないため、本家 ACL 同様の構造体に値をラップする `modint` パッケージを使用すると、数式の記述が `a.Add(b).Mul(c)` のように冗長になり、直感的な実装が難しくなる傾向があります。

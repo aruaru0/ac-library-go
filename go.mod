@@ -1,3 +1,5 @@
 module github.com/aruaru0/ac-library-go
 
-go 1.23.3
+go 1.25.0
+
+require golang.org/x/tools v0.45.0 // indirect

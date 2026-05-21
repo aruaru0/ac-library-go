@@ -57,8 +57,12 @@ func main() {
 	targetImports := make(map[string]string) // pkgName -> importPath (例: "dsu" -> "github.com...")
 	visitedPkgs := make(map[string]bool)
 
-	// 2. main.go の import から対象ライブラリを抽出して削除
+	// 2. main.go の import から対象ライブラリを抽出
+	var toDelete []string
 	for _, imp := range file.Imports {
+		if imp == nil || imp.Path == nil {
+			continue
+		}
 		path := strings.Trim(imp.Path.Value, `"`)
 		if strings.HasPrefix(path, libraryPrefix) {
 			pkgName := filepath.Base(path)
@@ -67,8 +71,13 @@ func main() {
 			}
 			targetImports[pkgName] = path
 			queue = append(queue, path)
-			astutil.DeleteImport(fset, file, path)
+			toDelete = append(toDelete, path)
 		}
+	}
+
+	// 安全に一括削除
+	for _, path := range toDelete {
+		astutil.DeleteImport(fset, file, path)
 	}
 
 	// 対象のインポートがない場合はそのまま出力して終了
@@ -115,6 +124,9 @@ func main() {
 			if err != nil {
 				log.Fatalf("ライブラリファイルのパースに失敗しました (%s): %v", fullPath, err)
 			}
+
+			// 非公開のトップレベル定義をパッケージ名付きにリネームして競合を防ぐ
+			renamePrivateDecls(pkgFile, filepath.Base(pkgInfo.Dir))
 
 			for _, decl := range pkgFile.Decls {
 				// import 宣言はスキップ
@@ -228,4 +240,65 @@ func writeResult(fset *token.FileSet, file *ast.File, outPath string) {
 			log.Fatalf("出力ファイルの書き込みに失敗しました: %v", err)
 		}
 	}
+}
+
+// ライブラリの非公開トップレベル定義をリネームして競合を防ぐ
+func renamePrivateDecls(file *ast.File, pkgName string) {
+	renameMap := make(map[string]string)
+	for _, decl := range file.Decls {
+		name := getDeclName(decl)
+		if name != "" && isPrivateName(name) {
+			renameMap[name] = pkgName + "_" + name
+		}
+	}
+
+	if len(renameMap) == 0 {
+		return
+	}
+
+	astutil.Apply(file, func(c *astutil.Cursor) bool {
+		n := c.Node()
+		ident, ok := n.(*ast.Ident)
+		if !ok {
+			return true
+		}
+
+		newName, exists := renameMap[ident.Name]
+		if !exists {
+			return true
+		}
+
+		parent := c.Parent()
+		if parent == nil {
+			return true
+		}
+
+		switch p := parent.(type) {
+		case *ast.SelectorExpr:
+			if p.Sel == ident {
+				return true
+			}
+		case *ast.KeyValueExpr:
+			if p.Key == ident {
+				return true
+			}
+		case *ast.FuncDecl:
+			if p.Recv != nil && p.Name == ident {
+				return true
+			}
+		case *ast.Field:
+			return true
+		}
+
+		c.Replace(&ast.Ident{Name: newName, NamePos: ident.NamePos})
+		return true
+	}, nil)
+}
+
+func isPrivateName(name string) bool {
+	if len(name) == 0 {
+		return false
+	}
+	r := name[0]
+	return r >= 'a' && r <= 'z'
 }

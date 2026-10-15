@@ -151,7 +151,7 @@ acl-go-expander -o submit.go main.go
 
 生成された `submit.go` をそのまま AtCoder などのジャッジシステムに提出してください。
 
-生成ファイルには、埋め込まれた各ライブラリソースの**ファイル単位の出典URL**（そのバージョンの GitHub permalink）が `// ---- source: ... ----` コメントとして自動付与され、ファイル先頭には生成ツールの出典バナーと、ライブラリの**ライセンス本文（MIT License）**が付きます。これは [AtCoder 生成AI対策ルール](https://info.atcoder.jp/entry/llm-rules-ja) が求める「コンテスト開始前に公開したコードの参照URLの添付」を満たし、かつ MIT ライセンスが要求する「著作権表示・許諾表示の同梱」を満たすためのものです。
+生成ファイルには、埋め込まれた各ライブラリソースの**ファイル単位の出典URL**（そのバージョンの GitHub permalink）が `// ---- source: ... ----` コメントとして自動付与され、ファイル先頭には生成ツールの出典バナーと、埋め込みコードの**著作権表示・SPDX識別子・ライセンスへのpermalink**が付きます。これは [AtCoder 生成AI対策ルール](https://info.atcoder.jp/entry/llm-rules-ja) が求める「コンテスト開始前に公開したコードの参照URLの添付」を満たし、かつ MIT ライセンスが要求する著作権表示等を簡潔に満たすためのものです。
 
 ```go
 // This file was assembled by acl-go-expander before the contest.
@@ -159,13 +159,10 @@ acl-go-expander -o submit.go main.go
 // The library code embedded below (see "source:" comments) was published
 // beforehand, in accordance with AtCoder's rules on pre-contest AI-generated code.
 //
-// ---------------------------------------------------------------------------
-// Embedded code license: https://github.com/aruaru0/ac-library-go/blob/<rev>/LICENSE
-//
-// MIT License
+// Embedded code: ac-library-go (MIT License)
 // Copyright (c) 2026 aruaru0
-// ... (ライセンス本文) ...
-// ---------------------------------------------------------------------------
+// SPDX-License-Identifier: MIT
+// License: https://github.com/aruaru0/ac-library-go/blob/<rev>/LICENSE
 
 package main
 

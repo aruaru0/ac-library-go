@@ -338,8 +338,9 @@ func gitHEAD(dir string) string {
 }
 
 // 先頭に付与する生成バナーを組み立てる。
-// 埋め込みコードのライセンスファイルが見つかった場合は、その本文も併記する
-// （MIT 等が要求する「著作権表示・許諾表示の同梱」を満たすため）。
+// 埋め込みコードにライセンスファイルがあれば、著作権表示・SPDX識別子・
+// ライセンス全文へのpermalinkを併記する（MIT 等の表示要件を簡潔に満たすため）。
+// 種類を判定できないライセンスの場合は、表示漏れを避けるため全文を同梱する。
 func buildBanner(mod Module) string {
 	repoBase, rev := repoBaseAndRev(mod)
 
@@ -351,23 +352,63 @@ func buildBanner(mod Module) string {
 	}
 
 	if name, data, ok := readLicense(mod); ok {
-		lines = append(lines,
-			"//",
-			"// ---------------------------------------------------------------------------",
-			fmt.Sprintf("// Embedded code license: %s/blob/%s/%s", repoBase, rev, name),
-			"//",
-		)
-		for _, l := range strings.Split(strings.TrimRight(string(data), "\n"), "\n") {
-			if l == "" {
-				lines = append(lines, "//")
-			} else {
-				lines = append(lines, "// "+l)
+		licenseURL := fmt.Sprintf("%s/blob/%s/%s", repoBase, rev, name)
+		if spdx, ok := spdxIdentifier(data); ok {
+			libName := filepath.Base(urlModulePath(mod))
+			lines = append(lines,
+				"//",
+				fmt.Sprintf("// Embedded code: %s (%s License)", libName, spdx),
+			)
+			if notice := copyrightNotice(data); notice != "" {
+				for _, l := range strings.Split(notice, "\n") {
+					lines = append(lines, "// "+l)
+				}
 			}
+			lines = append(lines,
+				fmt.Sprintf("// SPDX-License-Identifier: %s", spdx),
+				fmt.Sprintf("// License: %s", licenseURL),
+			)
+		} else {
+			lines = append(lines,
+				"//",
+				"// ---------------------------------------------------------------------------",
+				fmt.Sprintf("// Embedded code license: %s", licenseURL),
+				"//",
+			)
+			for _, l := range strings.Split(strings.TrimRight(string(data), "\n"), "\n") {
+				if l == "" {
+					lines = append(lines, "//")
+				} else {
+					lines = append(lines, "// "+l)
+				}
+			}
+			lines = append(lines, "// ---------------------------------------------------------------------------")
 		}
-		lines = append(lines, "// ---------------------------------------------------------------------------")
 	}
 
 	return strings.Join(lines, "\n")
+}
+
+// ライセンス本文から SPDX 識別子を推定する（判定できない場合は false）
+func spdxIdentifier(data []byte) (string, bool) {
+	text := string(data)
+	switch {
+	case strings.Contains(text, "MIT License"),
+		strings.Contains(text, "Permission is hereby granted, free of charge"):
+		return "MIT", true
+	}
+	return "", false
+}
+
+// ライセンス本文から著作権表示（Copyright 行）を抽出する
+func copyrightNotice(data []byte) string {
+	var notices []string
+	for _, l := range strings.Split(string(data), "\n") {
+		if l = strings.TrimSpace(l); strings.HasPrefix(l, "Copyright") {
+			notices = append(notices, l)
+		}
+	}
+	return strings.Join(notices, "\n")
 }
 
 // モジュールルートのライセンスファイルを探して読み込む

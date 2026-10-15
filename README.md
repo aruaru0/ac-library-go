@@ -151,6 +151,25 @@ acl-go-expander -o submit.go main.go
 
 生成された `submit.go` をそのまま AtCoder などのジャッジシステムに提出してください。
 
+生成ファイルには、埋め込まれた各ライブラリソースの**ファイル単位の出典URL**（そのバージョンの GitHub permalink）が `// ---- source: ... ----` コメントとして自動付与され、ファイル先頭には生成ツールの出典バナーが付きます。これは [AtCoder 生成AI対策ルール](https://info.atcoder.jp/entry/llm-rules-ja) が求める「コンテスト開始前に公開したコードの参照URLの添付」を満たすためのものです。
+
+```go
+// This file was assembled by acl-go-expander before the contest.
+// Tool: https://github.com/aruaru0/ac-library-go/blob/<rev>/cmd/acl-go-expander/main.go
+// The library code embedded below (see "source:" comments) was published
+// beforehand, in accordance with AtCoder's rules on pre-contest AI-generated code.
+
+package main
+
+// ...
+
+// ---- source: https://github.com/aruaru0/ac-library-go/blob/<rev>/dsu/dsu.go ----
+type DSU struct { /* ... */ }
+```
+
+> [!NOTE]
+> URLのリビジョンは、モジュールのタグまたはコミットハッシュ（疑似バージョンから抽出）を使用します。ローカルの開発チェックアウト（`replace` 等）で実行した場合は `git rev-parse HEAD`、それも取得できない場合は `main` にフォールバックします。
+
 ---
 
 ## modint と mint の違いについて

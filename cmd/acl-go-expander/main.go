@@ -19,10 +19,30 @@ import (
 	"golang.org/x/tools/go/ast/astutil"
 )
 
+// 対象ライブラリのインポートパスの接頭辞（末尾スラッシュ付き）
+const libraryPrefix = "github.com/aruaru0/ac-library-go/"
+
 type GoPackage struct {
-	Dir     string   `json:"Dir"`
-	GoFiles []string `json:"GoFiles"`
-	Imports []string `json:"Imports"`
+	Dir        string   `json:"Dir"`
+	ImportPath string   `json:"ImportPath"`
+	GoFiles    []string `json:"GoFiles"`
+	Imports    []string `json:"Imports"`
+	Module     Module   `json:"Module"`
+}
+
+// Module は go list -json が返すモジュール情報のうち、出典URLの生成に必要な項目
+type Module struct {
+	Path    string  `json:"Path"`
+	Version string  `json:"Version"`
+	Dir     string  `json:"Dir"`
+	Main    bool    `json:"Main"`
+	Replace *Module `json:"Replace"`
+}
+
+// lexChunk は 1 つのライブラリソースファイルに由来する宣言のまとまり
+type lexChunk struct {
+	sourceURL string
+	decls     []ast.Decl
 }
 
 func main() {
@@ -41,8 +61,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("入力ファイルのパースに失敗しました: %v", err)
 	}
-
-	const libraryPrefix = "github.com/aruaru0/ac-library-go/"
 
 	// 1. main.go 自体で定義されているトップレベルの名前を登録
 	declaredNames := make(map[string]bool)
@@ -82,12 +100,13 @@ func main() {
 
 	// 対象のインポートがない場合はそのまま出力して終了
 	if len(queue) == 0 {
-		writeResult(fset, file, outPath)
+		writeResult(fset, file, nil, "", outPath)
 		return
 	}
 
-	importedDecls := []ast.Decl{}
+	var chunks []*lexChunk
 	stdlibImports := make(map[string]bool)
+	var bannerRepoBase, bannerRev string
 
 	// 3. 依存関係の再帰的な解決とソースコードの収集
 	for len(queue) > 0 {
@@ -102,6 +121,11 @@ func main() {
 		pkgInfo, err := getPackageInfo(currPath)
 		if err != nil {
 			log.Fatalf("パッケージ情報の取得に失敗しました (%s): %v", currPath, err)
+		}
+
+		// 出典URL生成のためのリポジトリ情報（最初のパッケージのものを代表として使う）
+		if bannerRepoBase == "" {
+			bannerRepoBase, bannerRev = repoBaseAndRev(pkgInfo.Module)
 		}
 
 		// 依存関係を走査
@@ -128,6 +152,7 @@ func main() {
 			// 非公開のトップレベル定義をパッケージ名付きにリネームして競合を防ぐ
 			renamePrivateDecls(pkgFile, filepath.Base(pkgInfo.Dir))
 
+			chunk := &lexChunk{sourceURL: sourceURL(pkgInfo, fullPath)}
 			for _, decl := range pkgFile.Decls {
 				// import 宣言はスキップ
 				if genDecl, ok := decl.(*ast.GenDecl); ok && genDecl.Tok == token.IMPORT {
@@ -142,7 +167,10 @@ func main() {
 					}
 					declaredNames[name] = true
 				}
-				importedDecls = append(importedDecls, decl)
+				chunk.decls = append(chunk.decls, decl)
+			}
+			if len(chunk.decls) > 0 {
+				chunks = append(chunks, chunk)
 			}
 		}
 	}
@@ -169,15 +197,18 @@ func main() {
 	file = astutil.Apply(file, removePrefix, nil).(*ast.File)
 
 	// インポートしたライブラリ側のコードも同様に書き換え（内部参照の解決）
-	for i, decl := range importedDecls {
-		importedDecls[i] = astutil.Apply(decl, removePrefix, nil).(ast.Decl)
+	for _, chunk := range chunks {
+		for i, decl := range chunk.decls {
+			chunk.decls[i] = astutil.Apply(decl, removePrefix, nil).(ast.Decl)
+		}
 	}
 
-	// 6. 収集したライブラリコードを main.go の末尾に結合
-	file.Decls = append(file.Decls, importedDecls...)
-
-	// 7. 出力
-	writeResult(fset, file, outPath)
+	// 6. 出力（埋め込みコードごとにソースURLコメントを付与）
+	banner := ""
+	if bannerRepoBase != "" {
+		banner = buildBanner(bannerRepoBase, bannerRev)
+	}
+	writeResult(fset, file, chunks, banner, outPath)
 }
 
 // go list を使用してパッケージ情報を JSON で取得
@@ -200,6 +231,117 @@ func getPackageInfo(importPath string) (*GoPackage, error) {
 func isStdLib(importPath string) bool {
 	pkg, err := build.Import(importPath, "", build.FindOnly)
 	return err == nil && pkg.Goroot
+}
+
+// 出典URLのリポジトリbaseとリビジョンを求める
+func repoBaseAndRev(mod Module) (string, string) {
+	return "https://" + urlModulePath(mod), moduleRev(mod)
+}
+
+// 指定ファイルのGitHub permalink (ファイル単位) を生成する
+func sourceURL(pkg *GoPackage, absFile string) string {
+	base, rev := repoBaseAndRev(pkg.Module)
+	rel, err := filepath.Rel(moduleDir(pkg.Module), absFile)
+	if err != nil {
+		rel = filepath.Base(absFile)
+	}
+	return base + "/blob/" + rev + "/" + filepath.ToSlash(rel)
+}
+
+// 出典URLに使うモジュールパスを決める（replace されている場合はフォーク先を優先）
+func urlModulePath(mod Module) string {
+	if mod.Replace != nil && looksLikeModulePath(mod.Replace.Path) {
+		return mod.Replace.Path
+	}
+	if mod.Path != "" {
+		return mod.Path
+	}
+	// モジュール情報が取得できない場合は既知のライブラリのリポジトリにフォールバック
+	return strings.TrimSuffix(libraryPrefix, "/")
+}
+
+// モジュールのソースディレクトリ（replace されている場合は置換先）
+func moduleDir(mod Module) string {
+	if mod.Replace != nil && mod.Replace.Dir != "" {
+		return mod.Replace.Dir
+	}
+	return mod.Dir
+}
+
+// 出典URLに埋め込むリビジョン（タグ／コミットハッシュ）を求める
+func moduleRev(mod Module) string {
+	version := mod.Version
+	if mod.Replace != nil && mod.Replace.Version != "" {
+		version = mod.Replace.Version
+	}
+	if version != "" {
+		// 疑似バージョン (v0.0.0-20240101120000-abcdef123456) はコミットハッシュを使う
+		if hash := pseudoVersionHash(version); hash != "" {
+			return hash
+		}
+		return version
+	}
+	// ローカルの開発チェックアウト等では git の HEAD を試す
+	if dir := moduleDir(mod); dir != "" {
+		if hash := gitHEAD(dir); hash != "" {
+			return hash
+		}
+	}
+	return "main"
+}
+
+// 疑似バージョン形式の文字列からコミットハッシュ部分を取り出す
+func pseudoVersionHash(version string) string {
+	i := strings.LastIndex(version, "-")
+	if i < 0 {
+		return ""
+	}
+	hash := version[i+1:]
+	if len(hash) == 12 && isHex(hash) {
+		return hash
+	}
+	return ""
+}
+
+func isHex(s string) bool {
+	for _, r := range s {
+		if !((r >= '0' && r <= '9') || (r >= 'a' && r <= 'f')) {
+			return false
+		}
+	}
+	return true
+}
+
+// looksLikeModulePath はモジュールパスらしさ（先頭要素がドメイン）をざっくり判定する
+func looksLikeModulePath(path string) bool {
+	if path == "" || strings.HasPrefix(path, ".") || strings.HasPrefix(path, "/") {
+		return false
+	}
+	first := path
+	if i := strings.Index(path, "/"); i >= 0 {
+		first = path[:i]
+	}
+	return strings.Contains(first, ".")
+}
+
+// git rev-parse HEAD でコミットハッシュを取得する（取得できない場合は空文字）
+func gitHEAD(dir string) string {
+	cmd := exec.Command("git", "-C", dir, "rev-parse", "HEAD")
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+	if err := cmd.Run(); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(stdout.String())
+}
+
+// 先頭に付与する生成バナーを組み立てる
+func buildBanner(repoBase, rev string) string {
+	return fmt.Sprintf("// This file was assembled by acl-go-expander before the contest.\n"+
+		"// Tool: %s/blob/%s/cmd/acl-go-expander/main.go\n"+
+		"// The library code embedded below (see \"source:\" comments) was published\n"+
+		"// beforehand, in accordance with AtCoder's rules on pre-contest AI-generated code.",
+		repoBase, rev)
 }
 
 // 宣言からトップレベルの識別子名を取得する
@@ -227,16 +369,47 @@ func getDeclName(decl ast.Decl) string {
 }
 
 // 結果を出力 (フォーマット済みのGoコード)
-func writeResult(fset *token.FileSet, file *ast.File, outPath string) {
+func writeResult(fset *token.FileSet, file *ast.File, chunks []*lexChunk, banner string, outPath string) {
 	var buf bytes.Buffer
 	if err := format.Node(&buf, fset, file); err != nil {
 		log.Fatalf("ASTのフォーマットに失敗しました: %v", err)
 	}
 
+	var sb strings.Builder
+	if banner != "" {
+		sb.WriteString(banner)
+		sb.WriteString("\n\n")
+	}
+	sb.WriteString(buf.String())
+
+	// 埋め込みコードを、その出典URLコメントとともに結合する
+	for _, chunk := range chunks {
+		if len(chunk.decls) == 0 {
+			continue
+		}
+		sb.WriteString("\n// ---- source: ")
+		sb.WriteString(chunk.sourceURL)
+		sb.WriteString(" ----\n\n")
+		for _, decl := range chunk.decls {
+			var dbuf bytes.Buffer
+			if err := format.Node(&dbuf, fset, decl); err != nil {
+				log.Fatalf("埋め込みコードのフォーマットに失敗しました: %v", err)
+			}
+			sb.WriteString(dbuf.String())
+			sb.WriteString("\n\n")
+		}
+	}
+
+	// 全体をまとめて整形し直す（コメント挿入後の体裁を整える）
+	src, err := format.Source([]byte(sb.String()))
+	if err != nil {
+		log.Fatalf("出力コードの整形に失敗しました: %v", err)
+	}
+
 	if outPath == "" {
-		fmt.Print(buf.String())
+		fmt.Print(string(src))
 	} else {
-		if err := os.WriteFile(outPath, buf.Bytes(), 0644); err != nil {
+		if err := os.WriteFile(outPath, src, 0644); err != nil {
 			log.Fatalf("出力ファイルの書き込みに失敗しました: %v", err)
 		}
 	}

@@ -106,7 +106,8 @@ func main() {
 
 	var chunks []*lexChunk
 	stdlibImports := make(map[string]bool)
-	var bannerRepoBase, bannerRev string
+	var bannerMod Module
+	var haveBannerMod bool
 
 	// 3. 依存関係の再帰的な解決とソースコードの収集
 	for len(queue) > 0 {
@@ -124,8 +125,9 @@ func main() {
 		}
 
 		// 出典URL生成のためのリポジトリ情報（最初のパッケージのものを代表として使う）
-		if bannerRepoBase == "" {
-			bannerRepoBase, bannerRev = repoBaseAndRev(pkgInfo.Module)
+		if !haveBannerMod {
+			bannerMod = pkgInfo.Module
+			haveBannerMod = true
 		}
 
 		// 依存関係を走査
@@ -205,8 +207,8 @@ func main() {
 
 	// 6. 出力（埋め込みコードごとにソースURLコメントを付与）
 	banner := ""
-	if bannerRepoBase != "" {
-		banner = buildBanner(bannerRepoBase, bannerRev)
+	if haveBannerMod {
+		banner = buildBanner(bannerMod)
 	}
 	writeResult(fset, file, chunks, banner, outPath)
 }
@@ -335,13 +337,56 @@ func gitHEAD(dir string) string {
 	return strings.TrimSpace(stdout.String())
 }
 
-// 先頭に付与する生成バナーを組み立てる
-func buildBanner(repoBase, rev string) string {
-	return fmt.Sprintf("// This file was assembled by acl-go-expander before the contest.\n"+
-		"// Tool: %s/blob/%s/cmd/acl-go-expander/main.go\n"+
-		"// The library code embedded below (see \"source:\" comments) was published\n"+
+// 先頭に付与する生成バナーを組み立てる。
+// 埋め込みコードのライセンスファイルが見つかった場合は、その本文も併記する
+// （MIT 等が要求する「著作権表示・許諾表示の同梱」を満たすため）。
+func buildBanner(mod Module) string {
+	repoBase, rev := repoBaseAndRev(mod)
+
+	lines := []string{
+		"// This file was assembled by acl-go-expander before the contest.",
+		fmt.Sprintf("// Tool: %s/blob/%s/cmd/acl-go-expander/main.go", repoBase, rev),
+		"// The library code embedded below (see \"source:\" comments) was published",
 		"// beforehand, in accordance with AtCoder's rules on pre-contest AI-generated code.",
-		repoBase, rev)
+	}
+
+	if name, data, ok := readLicense(mod); ok {
+		lines = append(lines,
+			"//",
+			"// ---------------------------------------------------------------------------",
+			fmt.Sprintf("// Embedded code license: %s/blob/%s/%s", repoBase, rev, name),
+			"//",
+		)
+		for _, l := range strings.Split(strings.TrimRight(string(data), "\n"), "\n") {
+			if l == "" {
+				lines = append(lines, "//")
+			} else {
+				lines = append(lines, "// "+l)
+			}
+		}
+		lines = append(lines, "// ---------------------------------------------------------------------------")
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+// モジュールルートのライセンスファイルを探して読み込む
+func readLicense(mod Module) (name string, data []byte, ok bool) {
+	dir := moduleDir(mod)
+	if dir == "" {
+		return "", nil, false
+	}
+	for _, candidate := range []string{"LICENSE", "LICENSE.md", "LICENSE.txt", "COPYING", "COPYING.md"} {
+		p := filepath.Join(dir, candidate)
+		if info, err := os.Stat(p); err == nil && !info.IsDir() {
+			b, err := os.ReadFile(p)
+			if err != nil || len(bytes.TrimSpace(b)) == 0 {
+				return "", nil, false
+			}
+			return candidate, b, true
+		}
+	}
+	return "", nil, false
 }
 
 // 宣言からトップレベルの識別子名を取得する

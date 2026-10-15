@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -97,11 +99,41 @@ func TestSourceURL(t *testing.T) {
 }
 
 func TestBuildBanner(t *testing.T) {
-	banner := buildBanner("https://github.com/aruaru0/ac-library-go", "v1.2.3")
+	dir := t.TempDir()
+	licenseText := "MIT License\n\nCopyright (c) 2026 aruaru0\n"
+	if err := os.WriteFile(filepath.Join(dir, "LICENSE"), []byte(licenseText), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	mod := Module{
+		Path:    "github.com/aruaru0/ac-library-go",
+		Version: "v1.2.3",
+		Dir:     dir,
+	}
+	banner := buildBanner(mod)
+
 	if !strings.Contains(banner, "https://github.com/aruaru0/ac-library-go/blob/v1.2.3/cmd/acl-go-expander/main.go") {
 		t.Errorf("banner does not contain tool permalink: %q", banner)
 	}
+	if !strings.Contains(banner, "https://github.com/aruaru0/ac-library-go/blob/v1.2.3/LICENSE") {
+		t.Errorf("banner does not contain license permalink: %q", banner)
+	}
+	if !strings.Contains(banner, "// Copyright (c) 2026 aruaru0") {
+		t.Errorf("banner does not embed license body: %q", banner)
+	}
 	if !strings.HasPrefix(banner, "// ") {
 		t.Errorf("banner should be a line comment block: %q", banner)
+	}
+}
+
+func TestBuildBannerWithoutLicense(t *testing.T) {
+	mod := Module{
+		Path:    "github.com/aruaru0/ac-library-go",
+		Version: "v1.2.3",
+		Dir:     t.TempDir(),
+	}
+	banner := buildBanner(mod)
+	if strings.Contains(banner, "Embedded code license") {
+		t.Errorf("banner should not contain a license block when no license file exists: %q", banner)
 	}
 }
